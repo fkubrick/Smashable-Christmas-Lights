@@ -14,6 +14,8 @@ Audio Synthétique : Le son de bris de verre est généré en temps réel via l'
 
 Responsive : La guirlande s'adapte automatiquement à la largeur de la fenêtre.
 
+DEMO: https://codepen.io/FL0R3NT-K6BR1CK/pen/ZYWgjvx
+
 🚀 Installation rapide
 
 Il suffit d'inclure le fichier christmas_lights.html dans votre projet ou de copier le code CSS et JS dans vos fichiers respectifs.
