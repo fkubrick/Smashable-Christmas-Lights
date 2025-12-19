@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guirlande de Noël Smashable</title>
+    <style>
+        :root {
+            --wire-color: #222;
+            --bulb-width: 14px;
+            --bulb-height: 24px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a0a;
+            font-family: sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #christmas-lights-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .light-wire {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            fill: none;
+            stroke: var(--wire-color);
+            stroke-width: 2;
+        }
+
+        .bulb-wrapper {
+            position: absolute;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .bulb-wrapper:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .bulb-base {
+            width: 8px;
+            height: 6px;
+            background: #444;
+            border-radius: 2px 2px 0 0;
+        }
+
+        .bulb-glass {
+            width: var(--bulb-width);
+            height: var(--bulb-height);
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+            position: relative;
+            box-shadow: 0 0 15px var(--bulb-color);
+            background: var(--bulb-color);
+            opacity: 0.9;
+            transition: all 0.3s ease;
+        }
+
+        .bulb-glass::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 25%;
+            width: 30%;
+            height: 30%;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+        }
+
+        .bulb-wrapper.broken .bulb-glass {
+            opacity: 0;
+            pointer-events: none;
+            box-shadow: none;
+        }
+
+        .bulb-wrapper.broken .bulb-base::after {
+            content: '⚡';
+            position: absolute;
+            top: 5px;
+            font-size: 8px;
+            filter: grayscale(1);
+        }
+
+        .fragment {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--bulb-color);
+            pointer-events: none;
+            z-index: 1001;
+            border-radius: 1px;
+        }
+
+        .content-demo {
+            padding: 150px 20px;
+            color: white;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #c0392b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="christmas-lights-container">
+        <svg class="light-wire" id="wire-svg" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="content-demo">
+        <h1>Passez la souris pour casser les ampoules ! 🎄</h1>
+        <p><i>Note : Cliquez une fois sur la page pour activer le son.</i></p>
+        <button id="repair-btn">Réparer la guirlande</button>
+    </div>
+
+    <script>
+        const container = document.getElementById('christmas-lights-container');
+        const wireSvg = document.getElementById('wire-svg');
+        const colors = ['#ff4d4d', '#4dff4d', '#4d94ff', '#ffdb4d', '#ff4dff'];
+        
+        let audioCtx = null;
+        
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playShatterSound() {
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            // 1. Le "Crunch" (Bruit blanc filtré pour l'impact)
+            const bufferSize = audioCtx.sampleRate * 0.1; // 100ms
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.setValueAtTime(3000, now);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.15, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            // 2. Le "Ting" (Résonance cristalline haute fréquence)
+            const ting = audioCtx.createOscillator();
+            const tingGain = audioCtx.createGain();
+            
+            ting.type = 'sine';
+            // Fréquence fixe très haute pour l'aspect "verre"
+            ting.frequency.setValueAtTime(6000 + Math.random() * 2000, now);
+            
+            tingGain.gain.setValueAtTime(0.05, now);
+            tingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+            ting.connect(tingGain);
+            tingGain.connect(audioCtx.destination);
+
+            noise.start(now);
+            ting.start(now);
+            ting.stop(now + 0.1);
+        }
+
+        function createLights() {
+            container.querySelectorAll('.bulb-wrapper').forEach(b => b.remove());
+            
+            const bulbSpacing = 45; 
+            const bulbCount = Math.floor(window.innerWidth / bulbSpacing);
+            const actualSpacing = window.innerWidth / bulbCount;
+            
+            let pathD = `M 0 15 `;
+
+            for (let i = 0; i < bulbCount; i++) {
+                const x = i * actualSpacing + actualSpacing / 2;
+                const y = 30 + Math.sin(i * 0.5) * 15;
+                
+                pathD += `Q ${x - actualSpacing/4} ${y + 20}, ${x} ${y} `;
+
+                const bulbWrapper = document.createElement('div');
+                bulbWrapper.className = 'bulb-wrapper';
+                bulbWrapper.style.left = `${x - 7}px`;
+                bulbWrapper.style.top = `${y - 2}px`;
+                
+                const color = colors[i % colors.length];
+                bulbWrapper.style.setProperty('--bulb-color', color);
+
+                bulbWrapper.innerHTML = `
+                    <div class="bulb-base"></div>
+                    <div class="bulb-glass"></div>
+                `;
+
+                const triggerSmash = (e) => {
+                    initAudio();
+                    smashBulb(bulbWrapper, x, y, color);
+                };
+
+                bulbWrapper.addEventListener('mouseenter', triggerSmash);
+                bulbWrapper.addEventListener('click', triggerSmash);
+
+                container.appendChild(bulbWrapper);
+            }
+
+            pathD += ` L ${window.innerWidth} 15`;
+            wireSvg.innerHTML = `<path d="${pathD}" stroke="#222" stroke-width="2" fill="none" />`;
+        }
+
+        function smashBulb(el, x, y, color) {
+            if (el.classList.contains('broken')) return;
+
+            el.classList.add('broken');
+            playShatterSound();
+
+            for (let i = 0; i < 12; i++) {
+                createFragment(x, y, color);
+            }
+        }
+
+        function createFragment(x, y, color) {
+            const fragment = document.createElement('div');
+            fragment.className = 'fragment';
+            fragment.style.left = `${x}px`;
+            fragment.style.top = `${y}px`;
+            fragment.style.backgroundColor = color;
+            document.body.appendChild(fragment);
+
+            const angle = Math.random() * Math.PI * 2;
+            const velocity = 2 + Math.random() * 5;
+            let posX = x;
+            let posY = y;
+            let velX = Math.cos(angle) * velocity;
+            let velY = Math.sin(angle) * velocity - 1;
+            const gravity = 0.2;
+
+            function animate() {
+                velY += gravity;
+                posX += velX;
+                posY += velY;
+                
+                fragment.style.transform = `translate(${posX - x}px, ${posY - y}px) rotate(${posX * 1.5}deg)`;
+                
+                if (posY < window.innerHeight + 50) {
+                    requestAnimationFrame(animate);
+                } else {
+                    fragment.remove();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        document.getElementById('repair-btn').addEventListener('click', () => {
+            initAudio();
+            createLights();
+        });
+
+        document.body.addEventListener('mousedown', initAudio, { once: true });
+        window.addEventListener('load', createLights);
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(createLights, 250);
+        });
+    </script>
+</body>
+</html>
